@@ -290,6 +290,29 @@ const commands = [
         .setName("player_id")
         .setDescription("The player's PlayFab ID.")
         .setRequired(true)
+    ),
+
+  // ==========================
+  // /MESSAGE
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("message")
+    .setDescription("Send a private message to a Discord user.")
+
+    .addUserOption(option =>
+      option
+        .setName("user")
+        .setDescription("The Discord user to message.")
+        .setRequired(true)
+    )
+
+    .addStringOption(option =>
+      option
+        .setName("message")
+        .setDescription("The message to send.")
+        .setRequired(true)
+        .setMaxLength(1900)
     )
 
 ].map(command => command.toJSON());
@@ -395,7 +418,8 @@ client.on(
       interaction.commandName === "removeitem" ||
       interaction.commandName === "givecurrency" ||
       interaction.commandName === "removecurrency" ||
-      interaction.commandName === "inventory"
+      interaction.commandName === "inventory" ||
+      interaction.commandName === "message"
     ) {
 
       if (!canGrantItems(interaction)) {
@@ -679,7 +703,6 @@ client.on(
             "player_id"
           );
 
-        // Get the player's inventory
         const result =
           await playFabRequest(
             "GetUserInventory",
@@ -691,7 +714,6 @@ client.on(
         const inventory =
           result.data?.Inventory || [];
 
-        // No items
         if (inventory.length === 0) {
           return interaction.reply({
             content:
@@ -701,7 +723,6 @@ client.on(
           });
         }
 
-        // Build inventory message
         let inventoryText =
           `🎒 **Player Inventory**\n\n` +
           `**Player ID:** \`${playerId}\`\n\n`;
@@ -714,7 +735,6 @@ client.on(
             `Instance ID: \`${item.ItemInstanceId || "Unknown"}\`\n\n`;
         });
 
-        // Discord messages have a 2000 character limit
         if (inventoryText.length > 1900) {
 
           inventoryText =
@@ -724,6 +744,51 @@ client.on(
 
         return interaction.reply({
           content: inventoryText
+        });
+      }
+
+      // ==========================
+      // /MESSAGE
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "message"
+      ) {
+
+        const user =
+          interaction.options.getUser(
+            "user"
+          );
+
+        const message =
+          interaction.options.getString(
+            "message"
+          );
+
+        try {
+
+          await user.send({
+            content:
+              `📩 **Message from Dream World Staff**\n\n` +
+              message
+          });
+
+        } catch (error) {
+
+          return interaction.reply({
+            content:
+              `❌ I couldn't DM **${user.tag}**. They may have DMs disabled or blocked the bot.`,
+            ephemeral: true
+          });
+        }
+
+        return interaction.reply({
+          content:
+            `✅ **Message Sent**\n\n` +
+            `**User:** ${user}\n` +
+            `**Message:** ${message}`,
+          ephemeral: true
         });
       }
 
