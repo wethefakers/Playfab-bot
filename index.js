@@ -275,6 +275,21 @@ const commands = [
         .setDescription("Amount of currency to remove.")
         .setRequired(true)
         .setMinValue(1)
+    ),
+
+  // ==========================
+  // /INVENTORY
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("inventory")
+    .setDescription("View a player's PlayFab inventory.")
+
+    .addStringOption(option =>
+      option
+        .setName("player_id")
+        .setDescription("The player's PlayFab ID.")
+        .setRequired(true)
     )
 
 ].map(command => command.toJSON());
@@ -379,7 +394,8 @@ client.on(
       interaction.commandName === "grantitems" ||
       interaction.commandName === "removeitem" ||
       interaction.commandName === "givecurrency" ||
-      interaction.commandName === "removecurrency"
+      interaction.commandName === "removecurrency" ||
+      interaction.commandName === "inventory"
     ) {
 
       if (!canGrantItems(interaction)) {
@@ -646,6 +662,68 @@ client.on(
             `**Amount:** \`${amount}\`\n` +
             `**New Balance:** \`${result.data?.Balance ?? "Unknown"}\`\n` +
             `**Removed By:** ${interaction.user}`
+        });
+      }
+
+      // ==========================
+      // /INVENTORY
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "inventory"
+      ) {
+
+        const playerId =
+          interaction.options.getString(
+            "player_id"
+          );
+
+        // Get the player's inventory
+        const result =
+          await playFabRequest(
+            "GetUserInventory",
+            {
+              PlayFabId: playerId
+            }
+          );
+
+        const inventory =
+          result.data?.Inventory || [];
+
+        // No items
+        if (inventory.length === 0) {
+          return interaction.reply({
+            content:
+              `🎒 **Player Inventory**\n\n` +
+              `**Player ID:** \`${playerId}\`\n\n` +
+              `This player has no items in their inventory.`
+          });
+        }
+
+        // Build inventory message
+        let inventoryText =
+          `🎒 **Player Inventory**\n\n` +
+          `**Player ID:** \`${playerId}\`\n\n`;
+
+        inventory.forEach((item, index) => {
+
+          inventoryText +=
+            `**${index + 1}. ${item.DisplayName || item.ItemId}**\n` +
+            `Item ID: \`${item.ItemId || "Unknown"}\`\n` +
+            `Instance ID: \`${item.ItemInstanceId || "Unknown"}\`\n\n`;
+        });
+
+        // Discord messages have a 2000 character limit
+        if (inventoryText.length > 1900) {
+
+          inventoryText =
+            inventoryText.substring(0, 1850) +
+            `\n\n⚠️ Inventory is too large to display completely.`;
+        }
+
+        return interaction.reply({
+          content: inventoryText
         });
       }
 
