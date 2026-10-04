@@ -20,6 +20,10 @@ const {
   MOD_ROLE_IDS
 } = process.env;
 
+// ==============================
+// CHECK ENVIRONMENT VARIABLES
+// ==============================
+
 if (
   !DISCORD_TOKEN ||
   !CLIENT_ID ||
@@ -30,8 +34,23 @@ if (
   !MOD_ROLE_IDS
 ) {
   console.error("❌ Missing required environment variables.");
+
+  if (!DISCORD_TOKEN) console.error("Missing: DISCORD_TOKEN");
+  if (!CLIENT_ID) console.error("Missing: CLIENT_ID");
+  if (!GUILD_ID) console.error("Missing: GUILD_ID");
+  if (!PLAYFAB_TITLE_ID) console.error("Missing: PLAYFAB_TITLE_ID");
+  if (!PLAYFAB_SECRET_KEY) console.error("Missing: PLAYFAB_SECRET_KEY");
+  if (!PLAYFAB_CATALOG_VERSION) {
+    console.error("Missing: PLAYFAB_CATALOG_VERSION");
+  }
+  if (!MOD_ROLE_IDS) console.error("Missing: MOD_ROLE_IDS");
+
   process.exit(1);
 }
+
+// ==============================
+// MODERATOR ROLES
+// ==============================
 
 const allowedRoles = MOD_ROLE_IDS
   .split(",")
@@ -51,10 +70,12 @@ const PLAYFAB_URL =
 async function playFabRequest(endpoint, body) {
   const response = await fetch(`${PLAYFAB_URL}/${endpoint}`, {
     method: "POST",
+
     headers: {
       "Content-Type": "application/json",
       "X-SecretKey": PLAYFAB_SECRET_KEY
     },
+
     body: JSON.stringify(body)
   });
 
@@ -73,17 +94,18 @@ async function playFabRequest(endpoint, body) {
 }
 
 // ==============================
-// DISCORD COMMANDS
+// DISCORD SLASH COMMANDS
 // ==============================
 
 const commands = [
+
   // ==========================
   // /BAN
   // ==========================
 
   new SlashCommandBuilder()
     .setName("ban")
-    .setDescription("Permanently ban a player from Dream World.")
+    .setDescription("Ban a player from Dream World.")
     .addStringOption(option =>
       option
         .setName("player_id")
@@ -96,6 +118,15 @@ const commands = [
         .setDescription("Reason for the ban.")
         .setRequired(true)
         .setMaxLength(140)
+    )
+    .addIntegerOption(option =>
+      option
+        .setName("duration")
+        .setDescription(
+          "Ban duration in hours. Leave empty for permanent."
+        )
+        .setRequired(false)
+        .setMinValue(1)
     ),
 
   // ==========================
@@ -131,6 +162,7 @@ const commands = [
         .setDescription("The PlayFab catalog Item ID.")
         .setRequired(true)
     )
+
 ].map(command => command.toJSON());
 
 // ==============================
@@ -144,7 +176,10 @@ async function registerCommands() {
   console.log("🔄 Registering Dream World commands...");
 
   await rest.put(
-    Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+    Routes.applicationGuildCommands(
+      CLIENT_ID,
+      GUILD_ID
+    ),
     {
       body: commands
     }
@@ -158,7 +193,9 @@ async function registerCommands() {
 // ==============================
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [
+    GatewayIntentBits.Guilds
+  ]
 });
 
 // ==============================
@@ -166,7 +203,10 @@ const client = new Client({
 // ==============================
 
 function isStaff(interaction) {
-  if (!interaction.member || !interaction.member.roles) {
+  if (
+    !interaction.member ||
+    !interaction.member.roles
+  ) {
     return false;
   }
 
@@ -179,164 +219,245 @@ function isStaff(interaction) {
 // COMMAND HANDLER
 // ==============================
 
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand()) return;
+client.on(
+  "interactionCreate",
+  async interaction => {
 
-  // Only allow commands inside your Discord server
-  if (interaction.guildId !== GUILD_ID) {
-    return interaction.reply({
-      content: "❌ This bot can only be used in the Dream World server.",
-      ephemeral: true
-    });
-  }
-
-  // Staff check
-  if (!isStaff(interaction)) {
-    return interaction.reply({
-      content: "❌ You don't have permission to use this command.",
-      ephemeral: true
-    });
-  }
-
-  try {
+    if (!interaction.isChatInputCommand()) {
+      return;
+    }
 
     // ==========================
-    // /BAN
+    // SERVER CHECK
     // ==========================
 
-    if (interaction.commandName === "ban") {
-  const playerId =
-    interaction.options.getString("player_id");
+    if (interaction.guildId !== GUILD_ID) {
+      return interaction.reply({
+        content:
+          "❌ This bot can only be used in the Dream World server.",
+        ephemeral: true
+      });
+    }
 
-  const reason =
-    interaction.options.getString("reason");
+    // ==========================
+    // STAFF CHECK
+    // ==========================
 
-  const duration =
-    interaction.options.getInteger("duration");
+    if (!isStaff(interaction)) {
+      return interaction.reply({
+        content:
+          "❌ You don't have permission to use this command.",
+        ephemeral: true
+      });
+    }
 
-  let ban = {
-    PlayFabId: playerId,
-    Reason: reason
-  };
+    try {
 
-  // If a duration was provided, treat it as hours
-  if (duration !== null) {
-    ban.DurationInHours = duration;
-  }
+      // ==========================
+      // /BAN
+      // ==========================
 
-  await playFabRequest("BanUsers", {
-    Bans: [ban]
-  });
+      if (interaction.commandName === "ban") {
 
-  const durationText =
-    duration === null
-      ? "Permanent"
-      : `${duration} hours`;
+        const playerId =
+          interaction.options.getString(
+            "player_id"
+          );
 
-  return interaction.reply({
-    content:
-      `🔨 **Player Banned**\n\n` +
-      `**Player ID:** \`${playerId}\`\n` +
-      `**Reason:** ${reason}\n` +
-      `**Duration:** ${durationText}\n` +
-      `**Moderator:** ${interaction.user}`
-  });
-}
+        const reason =
+          interaction.options.getString(
+            "reason"
+          );
+
+        const duration =
+          interaction.options.getInteger(
+            "duration"
+          );
+
+        // ==========================
+        // CREATE BAN
+        // ==========================
+
+        const ban = {
+          PlayFabId: playerId,
+          Reason: reason
+        };
+
+        // If duration exists,
+        // PlayFab expects the duration in hours.
+        if (duration !== null) {
+          ban.DurationInHours = duration;
+        }
+
+        // ==========================
+        // SEND BAN TO PLAYFAB
+        // ==========================
+
+        await playFabRequest(
+          "BanUsers",
+          {
+            Bans: [ban]
+          }
+        );
+
+        // ==========================
+        // DISPLAY DURATION
+        // ==========================
+
+        const durationText =
+          duration === null
+            ? "Permanent"
+            : `${duration} hours`;
+
+        return interaction.reply({
+          content:
+            `🔨 **Player Banned**\n\n` +
+            `**Player ID:** \`${playerId}\`\n` +
+            `**Reason:** ${reason}\n` +
+            `**Duration:** ${durationText}\n` +
+            `**Moderator:** ${interaction.user}`
+        });
+      }
+
+      // ==========================
+      // /UNBAN
+      // ==========================
+
+      if (interaction.commandName === "unban") {
+
+        const playerId =
+          interaction.options.getString(
+            "player_id"
+          );
+
+        await playFabRequest(
+          "RevokeAllBansForUser",
+          {
+            PlayFabId: playerId
+          }
+        );
+
+        return interaction.reply({
+          content:
+            `🔓 **Player Unbanned**\n\n` +
+            `**Player ID:** \`${playerId}\`\n` +
+            `**Moderator:** ${interaction.user}`
+        });
+      }
+
+      // ==========================
+      // /GRANTITEMS
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "grantitems"
+      ) {
+
+        const playerId =
+          interaction.options.getString(
+            "player_id"
+          );
+
+        const itemId =
+          interaction.options.getString(
+            "item_id"
+          );
+
+        await playFabRequest(
+          "GrantItemsToUser",
+          {
+            PlayFabId: playerId,
+            CatalogVersion:
+              PLAYFAB_CATALOG_VERSION,
+            ItemIds: [itemId]
+          }
+        );
+
+        return interaction.reply({
+          content:
+            `🎁 **Item Granted**\n\n` +
+            `**Player ID:** \`${playerId}\`\n` +
+            `**Item ID:** \`${itemId}\`\n` +
+            `**Catalog:** \`${PLAYFAB_CATALOG_VERSION}\`\n` +
+            `**Moderator:** ${interaction.user}`
+        });
+      }
+
+    } catch (error) {
+
+      console.error(
+        "❌ PlayFab/Discord error:",
+        error
+      );
+
+      // ==========================
+      // ERROR AFTER REPLY
+      // ==========================
+
+      if (
+        interaction.replied ||
+        interaction.deferred
+      ) {
+        return interaction.editReply({
+          content:
+            `❌ **Command failed:** ${error.message}`
+        });
+      }
+
+      // ==========================
+      // NORMAL ERROR
+      // ==========================
 
       return interaction.reply({
         content:
-          `🔨 **Player Permanently Banned**\n\n` +
-          `**Player ID:** \`${playerId}\`\n` +
-          `**Reason:** ${reason}\n` +
-          `**Duration:** Permanent\n` +
-          `**Moderator:** ${interaction.user}`
+          `❌ **Command failed:** ${error.message}`,
+        ephemeral: true
       });
     }
-
-    // ==========================
-    // /UNBAN
-    // ==========================
-
-    if (interaction.commandName === "unban") {
-      const playerId =
-        interaction.options.getString("player_id");
-
-      await playFabRequest("RevokeAllBansForUser", {
-        PlayFabId: playerId
-      });
-
-      return interaction.reply({
-        content:
-          `🔓 **Player Unbanned**\n\n` +
-          `**Player ID:** \`${playerId}\`\n` +
-          `**Moderator:** ${interaction.user}`
-      });
-    }
-
-    // ==========================
-    // /GRANTITEMS
-    // ==========================
-
-    if (interaction.commandName === "grantitems") {
-      const playerId =
-        interaction.options.getString("player_id");
-
-      const itemId =
-        interaction.options.getString("item_id");
-
-      await playFabRequest("GrantItemsToUser", {
-        PlayFabId: playerId,
-        CatalogVersion: PLAYFAB_CATALOG_VERSION,
-        ItemIds: [itemId]
-      });
-
-      return interaction.reply({
-        content:
-          `🎁 **Item Granted**\n\n` +
-          `**Player ID:** \`${playerId}\`\n` +
-          `**Item ID:** \`${itemId}\`\n` +
-          `**Catalog:** \`${PLAYFAB_CATALOG_VERSION}\`\n` +
-          `**Moderator:** ${interaction.user}`
-      });
-    }
-
-  } catch (error) {
-    console.error("PlayFab/Discord error:", error);
-
-    if (interaction.replied || interaction.deferred) {
-      return interaction.editReply({
-        content:
-          `❌ **Command failed:** ${error.message}`
-      });
-    }
-
-    return interaction.reply({
-      content:
-        `❌ **Command failed:** ${error.message}`,
-      ephemeral: true
-    });
   }
-});
+);
 
 // ==============================
 // BOT READY
 // ==============================
 
-client.once("ready", () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
-  console.log("🌙 Dream World PlayFab Bot is online.");
-});
+client.once(
+  "ready",
+  () => {
+
+    console.log(
+      `✅ Logged in as ${client.user.tag}`
+    );
+
+    console.log(
+      "🌙 Dream World PlayFab Bot is online."
+    );
+  }
+);
 
 // ==============================
-// START
+// START BOT
 // ==============================
 
 (async () => {
+
   try {
+
     await registerCommands();
-    await client.login(DISCORD_TOKEN);
+
+    await client.login(
+      DISCORD_TOKEN
+    );
+
   } catch (error) {
-    console.error("❌ Startup error:", error);
+
+    console.error(
+      "❌ Startup error:",
+      error
+    );
+
     process.exit(1);
   }
+
 })();
