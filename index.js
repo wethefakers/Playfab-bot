@@ -17,7 +17,8 @@ const {
   PLAYFAB_TITLE_ID,
   PLAYFAB_SECRET_KEY,
   PLAYFAB_CATALOG_VERSION,
-  MOD_ROLE_IDS
+  MOD_ROLE_IDS,
+  GRANT_ITEM_ROLE_ID
 } = process.env;
 
 // ==============================
@@ -31,19 +32,42 @@ if (
   !PLAYFAB_TITLE_ID ||
   !PLAYFAB_SECRET_KEY ||
   !PLAYFAB_CATALOG_VERSION ||
-  !MOD_ROLE_IDS
+  !MOD_ROLE_IDS ||
+  !GRANT_ITEM_ROLE_ID
 ) {
   console.error("❌ Missing required environment variables.");
 
-  if (!DISCORD_TOKEN) console.error("Missing: DISCORD_TOKEN");
-  if (!CLIENT_ID) console.error("Missing: CLIENT_ID");
-  if (!GUILD_ID) console.error("Missing: GUILD_ID");
-  if (!PLAYFAB_TITLE_ID) console.error("Missing: PLAYFAB_TITLE_ID");
-  if (!PLAYFAB_SECRET_KEY) console.error("Missing: PLAYFAB_SECRET_KEY");
+  if (!DISCORD_TOKEN) {
+    console.error("Missing: DISCORD_TOKEN");
+  }
+
+  if (!CLIENT_ID) {
+    console.error("Missing: CLIENT_ID");
+  }
+
+  if (!GUILD_ID) {
+    console.error("Missing: GUILD_ID");
+  }
+
+  if (!PLAYFAB_TITLE_ID) {
+    console.error("Missing: PLAYFAB_TITLE_ID");
+  }
+
+  if (!PLAYFAB_SECRET_KEY) {
+    console.error("Missing: PLAYFAB_SECRET_KEY");
+  }
+
   if (!PLAYFAB_CATALOG_VERSION) {
     console.error("Missing: PLAYFAB_CATALOG_VERSION");
   }
-  if (!MOD_ROLE_IDS) console.error("Missing: MOD_ROLE_IDS");
+
+  if (!MOD_ROLE_IDS) {
+    console.error("Missing: MOD_ROLE_IDS");
+  }
+
+  if (!GRANT_ITEM_ROLE_ID) {
+    console.error("Missing: GRANT_ITEM_ROLE_ID");
+  }
 
   process.exit(1);
 }
@@ -216,6 +240,23 @@ function isStaff(interaction) {
 }
 
 // ==============================
+// GRANT ITEM ROLE CHECK
+// ==============================
+
+function canGrantItems(interaction) {
+  if (
+    !interaction.member ||
+    !interaction.member.roles
+  ) {
+    return false;
+  }
+
+  return interaction.member.roles.cache.has(
+    GRANT_ITEM_ROLE_ID
+  );
+}
+
+// ==============================
 // COMMAND HANDLER
 // ==============================
 
@@ -240,15 +281,30 @@ client.on(
     }
 
     // ==========================
-    // STAFF CHECK
+    // PERMISSION CHECK
     // ==========================
 
-    if (!isStaff(interaction)) {
-      return interaction.reply({
-        content:
-          "❌ You don't have permission to use this command.",
-        ephemeral: true
-      });
+    // /grantitems uses its own special role.
+    if (interaction.commandName === "grantitems") {
+
+      if (!canGrantItems(interaction)) {
+        return interaction.reply({
+          content:
+            "❌ You don't have permission to use /grantitems.",
+          ephemeral: true
+        });
+      }
+
+    } else {
+
+      // /ban and /unban use the moderator roles.
+      if (!isStaff(interaction)) {
+        return interaction.reply({
+          content:
+            "❌ You don't have permission to use this command.",
+          ephemeral: true
+        });
+      }
     }
 
     try {
@@ -364,6 +420,10 @@ client.on(
             "item_id"
           );
 
+        // ==========================
+        // GRANT ITEM TO PLAYFAB
+        // ==========================
+
         await playFabRequest(
           "GrantItemsToUser",
           {
@@ -374,13 +434,17 @@ client.on(
           }
         );
 
+        // ==========================
+        // SUCCESS MESSAGE
+        // ==========================
+
         return interaction.reply({
           content:
             `🎁 **Item Granted**\n\n` +
             `**Player ID:** \`${playerId}\`\n` +
             `**Item ID:** \`${itemId}\`\n` +
             `**Catalog:** \`${PLAYFAB_CATALOG_VERSION}\`\n` +
-            `**Moderator:** ${interaction.user}`
+            `**Granted By:** ${interaction.user}`
         });
       }
 
