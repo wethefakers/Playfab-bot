@@ -1,1 +1,12 @@
-
+{
+  "name": "dream-world-playfab-bot",
+  "version": "1.0.0",
+  "description": "Dream World PlayFab Discord moderation bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.25.0"
+  }
+}
