@@ -313,6 +313,21 @@ const commands = [
         .setDescription("The message to send.")
         .setRequired(true)
         .setMaxLength(1900)
+    ),
+
+  // ==========================
+  // /SUE
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("sue")
+    .setDescription("Send a fake Dream World lawsuit to a user.")
+
+    .addUserOption(option =>
+      option
+        .setName("user")
+        .setDescription("The Dream World player being sued.")
+        .setRequired(true)
     )
 
 ].map(command => command.toJSON());
@@ -419,7 +434,8 @@ client.on(
       interaction.commandName === "givecurrency" ||
       interaction.commandName === "removecurrency" ||
       interaction.commandName === "inventory" ||
-      interaction.commandName === "message"
+      interaction.commandName === "message" ||
+      interaction.commandName === "sue"
     ) {
 
       if (!canGrantItems(interaction)) {
@@ -789,6 +805,68 @@ client.on(
             `**User:** ${user}\n` +
             `**Message:** ${message}`,
           ephemeral: true
+        });
+      }
+
+      // ==========================
+      // /SUE
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "sue"
+      ) {
+
+        const user =
+          interaction.options.getUser(
+            "user"
+          );
+
+        // Automatically create the actual
+        // Discord mention for the selected user.
+        const mention =
+          `<@${user.id}>`;
+
+        const lawsuit =
+          `⚖️ **DREAM WORLD LEGAL DEPARTMENT™** ⚖️\n\n` +
+
+          `**TO:** ${mention}\n` +
+          `**SUBJECT:** Alleged Scamming of Dream World Players\n\n` +
+
+          `Dear ${mention},\n\n` +
+
+          `This is your **official unofficial legal notice** from the ` +
+          `Dream World Legal Department™ regarding your alleged involvement ` +
+          `in **scamming players within Dream World**.\n\n` +
+
+          `Multiple players have allegedly reported suspicious transactions, ` +
+          `missing items, and general **scammer behavior™** connected to you.\n\n` +
+
+          `You are hereby **summoned to the Dream World Court™** to defend ` +
+          `yourself against the following extremely serious charges:\n\n` +
+
+          `🧾 **Count 1:** Scamming Dream World players\n` +
+          `💰 **Count 2:** Financial tomfoolery\n` +
+          `🎮 **Count 3:** Violating the sacred laws of Dream World\n` +
+          `🤨 **Count 4:** Being suspicious as hell\n\n` +
+
+          `**Possible sentence:**\n` +
+          `🔨 10 minutes in the Dream World jail\n` +
+          `💸 Return of all allegedly scammed items\n` +
+          `🚫 Temporary loss of your Dream World privileges\n` +
+          `🌱 Mandatory grass-touching\n\n` +
+
+          `Failure to appear before the **Dream World Court™** may result ` +
+          `in immediate sentencing by **Judge Nugget**.\n\n` +
+
+          `**This document is completely fake and is intended purely as a joke/troll.** 😂\n\n` +
+
+          `**Signed,**\n` +
+          `⚖️ **Dream World Legal Department™**\n` +
+          `*“Keeping Dream World 100% scam-free since whenever we decided.”*`;
+
+        return interaction.reply({
+          content: lawsuit
         });
       }
 
