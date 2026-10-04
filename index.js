@@ -130,12 +130,14 @@ const commands = [
   new SlashCommandBuilder()
     .setName("ban")
     .setDescription("Ban a player from Dream World.")
+
     .addStringOption(option =>
       option
         .setName("player_id")
         .setDescription("The player's PlayFab ID.")
         .setRequired(true)
     )
+
     .addStringOption(option =>
       option
         .setName("reason")
@@ -143,6 +145,7 @@ const commands = [
         .setRequired(true)
         .setMaxLength(140)
     )
+
     .addIntegerOption(option =>
       option
         .setName("duration")
@@ -160,6 +163,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName("unban")
     .setDescription("Unban a PlayFab player.")
+
     .addStringOption(option =>
       option
         .setName("player_id")
@@ -174,17 +178,103 @@ const commands = [
   new SlashCommandBuilder()
     .setName("grantitems")
     .setDescription("Grant an item to a PlayFab player.")
+
     .addStringOption(option =>
       option
         .setName("player_id")
         .setDescription("The player's PlayFab ID.")
         .setRequired(true)
     )
+
     .addStringOption(option =>
       option
         .setName("item_id")
         .setDescription("The PlayFab catalog Item ID.")
         .setRequired(true)
+    ),
+
+  // ==========================
+  // /REMOVEITEM
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("removeitem")
+    .setDescription("Remove an item from a PlayFab player.")
+
+    .addStringOption(option =>
+      option
+        .setName("player_id")
+        .setDescription("The player's PlayFab ID.")
+        .setRequired(true)
+    )
+
+    .addStringOption(option =>
+      option
+        .setName("item_instance_id")
+        .setDescription("The item's PlayFab Instance ID.")
+        .setRequired(true)
+    ),
+
+  // ==========================
+  // /GIVECURRENCY
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("givecurrency")
+    .setDescription("Give virtual currency to a PlayFab player.")
+
+    .addStringOption(option =>
+      option
+        .setName("player_id")
+        .setDescription("The player's PlayFab ID.")
+        .setRequired(true)
+    )
+
+    .addStringOption(option =>
+      option
+        .setName("currency")
+        .setDescription("The PlayFab currency code, such as GC.")
+        .setRequired(true)
+        .setMaxLength(2)
+    )
+
+    .addIntegerOption(option =>
+      option
+        .setName("amount")
+        .setDescription("Amount of currency to give.")
+        .setRequired(true)
+        .setMinValue(1)
+    ),
+
+  // ==========================
+  // /REMOVECURRENCY
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("removecurrency")
+    .setDescription("Remove virtual currency from a PlayFab player.")
+
+    .addStringOption(option =>
+      option
+        .setName("player_id")
+        .setDescription("The player's PlayFab ID.")
+        .setRequired(true)
+    )
+
+    .addStringOption(option =>
+      option
+        .setName("currency")
+        .setDescription("The PlayFab currency code, such as GC.")
+        .setRequired(true)
+        .setMaxLength(2)
+    )
+
+    .addIntegerOption(option =>
+      option
+        .setName("amount")
+        .setDescription("Amount of currency to remove.")
+        .setRequired(true)
+        .setMinValue(1)
     )
 
 ].map(command => command.toJSON());
@@ -284,20 +374,25 @@ client.on(
     // PERMISSION CHECK
     // ==========================
 
-    // /grantitems uses its own special role.
-    if (interaction.commandName === "grantitems") {
+    // These commands use GRANT_ITEM_ROLE_ID
+    if (
+      interaction.commandName === "grantitems" ||
+      interaction.commandName === "removeitem" ||
+      interaction.commandName === "givecurrency" ||
+      interaction.commandName === "removecurrency"
+    ) {
 
       if (!canGrantItems(interaction)) {
         return interaction.reply({
           content:
-            "❌ You don't have permission to use /grantitems.",
+            "❌ You don't have permission to use this command.",
           ephemeral: true
         });
       }
 
     } else {
 
-      // /ban and /unban use the moderator roles.
+      // /ban and /unban use MOD_ROLE_IDS
       if (!isStaff(interaction)) {
         return interaction.reply({
           content:
@@ -330,10 +425,6 @@ client.on(
             "duration"
           );
 
-        // ==========================
-        // CREATE BAN
-        // ==========================
-
         const ban = {
           PlayFabId: playerId,
           Reason: reason
@@ -345,20 +436,12 @@ client.on(
           ban.DurationInHours = duration;
         }
 
-        // ==========================
-        // SEND BAN TO PLAYFAB
-        // ==========================
-
         await playFabRequest(
           "BanUsers",
           {
             Bans: [ban]
           }
         );
-
-        // ==========================
-        // DISPLAY DURATION
-        // ==========================
 
         const durationText =
           duration === null
@@ -420,10 +503,6 @@ client.on(
             "item_id"
           );
 
-        // ==========================
-        // GRANT ITEM TO PLAYFAB
-        // ==========================
-
         await playFabRequest(
           "GrantItemsToUser",
           {
@@ -434,10 +513,6 @@ client.on(
           }
         );
 
-        // ==========================
-        // SUCCESS MESSAGE
-        // ==========================
-
         return interaction.reply({
           content:
             `🎁 **Item Granted**\n\n` +
@@ -445,6 +520,132 @@ client.on(
             `**Item ID:** \`${itemId}\`\n` +
             `**Catalog:** \`${PLAYFAB_CATALOG_VERSION}\`\n` +
             `**Granted By:** ${interaction.user}`
+        });
+      }
+
+      // ==========================
+      // /REMOVEITEM
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "removeitem"
+      ) {
+
+        const playerId =
+          interaction.options.getString(
+            "player_id"
+          );
+
+        const itemInstanceId =
+          interaction.options.getString(
+            "item_instance_id"
+          );
+
+        await playFabRequest(
+          "RevokeInventoryItem",
+          {
+            PlayFabId: playerId,
+            ItemInstanceId: itemInstanceId
+          }
+        );
+
+        return interaction.reply({
+          content:
+            `🗑️ **Item Removed**\n\n` +
+            `**Player ID:** \`${playerId}\`\n` +
+            `**Item Instance ID:** \`${itemInstanceId}\`\n` +
+            `**Removed By:** ${interaction.user}`
+        });
+      }
+
+      // ==========================
+      // /GIVECURRENCY
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "givecurrency"
+      ) {
+
+        const playerId =
+          interaction.options.getString(
+            "player_id"
+          );
+
+        const currency =
+          interaction.options.getString(
+            "currency"
+          ).toUpperCase();
+
+        const amount =
+          interaction.options.getInteger(
+            "amount"
+          );
+
+        const result =
+          await playFabRequest(
+            "AddUserVirtualCurrency",
+            {
+              PlayFabId: playerId,
+              VirtualCurrency: currency,
+              Amount: amount
+            }
+          );
+
+        return interaction.reply({
+          content:
+            `💰 **Currency Added**\n\n` +
+            `**Player ID:** \`${playerId}\`\n` +
+            `**Currency:** \`${currency}\`\n` +
+            `**Amount:** \`${amount}\`\n` +
+            `**New Balance:** \`${result.data?.Balance ?? "Unknown"}\`\n` +
+            `**Given By:** ${interaction.user}`
+        });
+      }
+
+      // ==========================
+      // /REMOVECURRENCY
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "removecurrency"
+      ) {
+
+        const playerId =
+          interaction.options.getString(
+            "player_id"
+          );
+
+        const currency =
+          interaction.options.getString(
+            "currency"
+          ).toUpperCase();
+
+        const amount =
+          interaction.options.getInteger(
+            "amount"
+          );
+
+        const result =
+          await playFabRequest(
+            "SubtractUserVirtualCurrency",
+            {
+              PlayFabId: playerId,
+              VirtualCurrency: currency,
+              Amount: amount
+            }
+          );
+
+        return interaction.reply({
+          content:
+            `💸 **Currency Removed**\n\n` +
+            `**Player ID:** \`${playerId}\`\n` +
+            `**Currency:** \`${currency}\`\n` +
+            `**Amount:** \`${amount}\`\n` +
+            `**New Balance:** \`${result.data?.Balance ?? "Unknown"}\`\n` +
+            `**Removed By:** ${interaction.user}`
         });
       }
 
