@@ -3,8 +3,7 @@ const {
   GatewayIntentBits,
   REST,
   Routes,
-  SlashCommandBuilder,
-  PermissionFlagsBits
+  SlashCommandBuilder
 } = require("discord.js");
 
 // ==============================
@@ -78,9 +77,13 @@ async function playFabRequest(endpoint, body) {
 // ==============================
 
 const commands = [
+  // ==========================
+  // /BAN
+  // ==========================
+
   new SlashCommandBuilder()
     .setName("ban")
-    .setDescription("Ban a player from Dream World.")
+    .setDescription("Permanently ban a player from Dream World.")
     .addStringOption(option =>
       option
         .setName("player_id")
@@ -93,25 +96,11 @@ const commands = [
         .setDescription("Reason for the ban.")
         .setRequired(true)
         .setMaxLength(140)
-    )
-    .addIntegerOption(option =>
-      option
-        .setName("duration")
-        .setDescription("Ban duration. Leave empty for permanent.")
-        .setRequired(false)
-        .setMinValue(1)
-    )
-    .addStringOption(option =>
-      option
-        .setName("time")
-        .setDescription("Time unit.")
-        .setRequired(false)
-        .addChoices(
-          { name: "Minutes", value: "minutes" },
-          { name: "Hours", value: "hours" },
-          { name: "Days", value: "days" }
-        )
     ),
+
+  // ==========================
+  // /UNBAN
+  // ==========================
 
   new SlashCommandBuilder()
     .setName("unban")
@@ -122,6 +111,10 @@ const commands = [
         .setDescription("The player's PlayFab ID.")
         .setRequired(true)
     ),
+
+  // ==========================
+  // /GRANTITEMS
+  // ==========================
 
   new SlashCommandBuilder()
     .setName("grantitems")
@@ -206,75 +199,57 @@ client.on("interactionCreate", async interaction => {
   }
 
   try {
+
     // ==========================
     // /BAN
     // ==========================
 
     if (interaction.commandName === "ban") {
-      const playerId = interaction.options.getString("player_id");
-      const reason = interaction.options.getString("reason");
+  const playerId =
+    interaction.options.getString("player_id");
 
-      const duration = interaction.options.getInteger("duration");
-      const time = interaction.options.getString("time");
+  const reason =
+    interaction.options.getString("reason");
 
-      let durationInHours;
+  const duration =
+    interaction.options.getInteger("duration");
 
-      // Permanent ban
-      if (!duration) {
-        durationInHours = undefined;
-      } else {
-        if (!time) {
-          return interaction.reply({
-            content:
-              "❌ You provided a duration but didn't select a time unit.",
-            ephemeral: true
-          });
-        }
+  let ban = {
+    PlayFabId: playerId,
+    Reason: reason
+  };
 
-        switch (time) {
-          case "minutes":
-            durationInHours = duration / 60;
-            break;
+  // If a duration was provided, treat it as hours
+  if (duration !== null) {
+    ban.DurationInHours = duration;
+  }
 
-          case "hours":
-            durationInHours = duration;
-            break;
+  await playFabRequest("BanUsers", {
+    Bans: [ban]
+  });
 
-          case "days":
-            durationInHours = duration * 24;
-            break;
+  const durationText =
+    duration === null
+      ? "Permanent"
+      : `${duration} hours`;
 
-          default:
-            throw new Error("Invalid time unit.");
-        }
-      }
-
-      const ban = {
-        PlayFabId: playerId,
-        Reason: reason
-      };
-
-      if (durationInHours !== undefined) {
-        ban.DurationInHours = durationInHours;
-      }
-
-      await playFabRequest("BanUsers", {
-        Bans: [ban]
-      });
-
-      const durationText =
-        durationInHours === undefined
-          ? "Permanent"
-          : `${duration} ${time}`;
+  return interaction.reply({
+    content:
+      `🔨 **Player Banned**\n\n` +
+      `**Player ID:** \`${playerId}\`\n` +
+      `**Reason:** ${reason}\n` +
+      `**Duration:** ${durationText}\n` +
+      `**Moderator:** ${interaction.user}`
+  });
+}
 
       return interaction.reply({
         content:
-          `🔨 **Player Banned**\n\n` +
+          `🔨 **Player Permanently Banned**\n\n` +
           `**Player ID:** \`${playerId}\`\n` +
           `**Reason:** ${reason}\n` +
-          `**Duration:** ${durationText}\n` +
-          `**Moderator:** ${interaction.user}`,
-        ephemeral: false
+          `**Duration:** Permanent\n` +
+          `**Moderator:** ${interaction.user}`
       });
     }
 
