@@ -328,6 +328,36 @@ const commands = [
         .setName("user")
         .setDescription("The Dream World player being sued.")
         .setRequired(true)
+    ),
+
+  // ==========================
+  // /ACCEPT
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("accept")
+    .setDescription("Accept a user's Dream World staff application.")
+
+    .addUserOption(option =>
+      option
+        .setName("user")
+        .setDescription("The user who was accepted.")
+        .setRequired(true)
+    ),
+
+  // ==========================
+  // /DENY
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("deny")
+    .setDescription("Deny a user's Dream World staff application.")
+
+    .addUserOption(option =>
+      option
+        .setName("user")
+        .setDescription("The user who was denied.")
+        .setRequired(true)
     )
 
 ].map(command => command.toJSON());
@@ -435,7 +465,9 @@ client.on(
       interaction.commandName === "removecurrency" ||
       interaction.commandName === "inventory" ||
       interaction.commandName === "message" ||
-      interaction.commandName === "sue"
+      interaction.commandName === "sue" ||
+      interaction.commandName === "accept" ||
+      interaction.commandName === "deny"
     ) {
 
       if (!canGrantItems(interaction)) {
@@ -835,6 +867,110 @@ client.on(
             `✅ **Message Sent**\n\n` +
             `**User:** ${user}\n` +
             `**Message:** ${message}`,
+          ephemeral: true
+        });
+      }
+
+      // ==========================
+      // /ACCEPT
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "accept"
+      ) {
+
+        const user =
+          interaction.options.getUser(
+            "user"
+          );
+
+        const acceptMessage =
+          `The team at Dream World as reviewed over your application and we are glad to announce that you have made the team!\n\n` +
+
+          `We wish that you can keep continuing on the work, and hope to promote you to higher roles.\n\n` +
+
+          `After reading this message please go to staff rules and please read them over. Have a great day!\n\n` +
+
+          `Love\n` +
+          `Dream World Team!`;
+
+        try {
+
+          await user.send({
+            content: acceptMessage
+          });
+
+        } catch (error) {
+
+          console.error(
+            "❌ Could not DM accepted applicant:",
+            error
+          );
+
+          return interaction.reply({
+            content:
+              `❌ I couldn't DM **${user.tag}**. They may have DMs disabled or blocked the bot.`,
+            ephemeral: true
+          });
+        }
+
+        return interaction.reply({
+          content:
+            `✅ **Application Accepted**\n\n` +
+            `The acceptance message was successfully sent to ${user}.`,
+          ephemeral: true
+        });
+      }
+
+      // ==========================
+      // /DENY
+      // ==========================
+
+      if (
+        interaction.commandName ===
+        "deny"
+      ) {
+
+        const user =
+          interaction.options.getUser(
+            "user"
+          );
+
+        const denyMessage =
+          `The team at Dream World has reviewed over your application and we are sorry to inform you that you haven't made the team.\n\n` +
+
+          `We wish that you continue being active in the community and reporting players to have a chance next time you apply. We wish you the best of luck next time.\n\n` +
+
+          `Please do not go into the discord and complain and whine that you didn't make the staff team.\n\n` +
+
+          `Love\n` +
+          `Dream World Team`;
+
+        try {
+
+          await user.send({
+            content: denyMessage
+          });
+
+        } catch (error) {
+
+          console.error(
+            "❌ Could not DM denied applicant:",
+            error
+          );
+
+          return interaction.reply({
+            content:
+              `❌ I couldn't DM **${user.tag}**. They may have DMs disabled or blocked the bot.`,
+            ephemeral: true
+          });
+        }
+
+        return interaction.reply({
+          content:
+            `❌ **Application Denied**\n\n` +
+            `The denial message was successfully sent to ${user}.`,
           ephemeral: true
         });
       }
