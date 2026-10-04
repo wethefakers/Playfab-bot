@@ -486,8 +486,6 @@ client.on(
           Reason: reason
         };
 
-        // If duration exists,
-        // PlayFab expects the duration in hours.
         if (duration !== null) {
           ban.DurationInHours = duration;
         }
@@ -822,8 +820,6 @@ client.on(
             "user"
           );
 
-        // Automatically create the actual
-        // Discord mention for the selected user.
         const mention =
           `<@${user.id}>`;
 
@@ -865,8 +861,39 @@ client.on(
           `⚖️ **Dream World Legal Department™**\n` +
           `*“Keeping Dream World 100% scam-free since whenever we decided.”*`;
 
+        // ==========================
+        // SEND LAWSUIT TO DM
+        // ==========================
+
+        try {
+
+          await user.send({
+            content: lawsuit
+          });
+
+        } catch (error) {
+
+          console.error(
+            "❌ Could not DM lawsuit recipient:",
+            error
+          );
+
+          return interaction.reply({
+            content:
+              `❌ I couldn't DM **${user.tag}**. They may have DMs disabled or blocked the bot.`,
+            ephemeral: true
+          });
+        }
+
+        // ==========================
+        // PRIVATE STAFF CONFIRMATION
+        // ==========================
+
         return interaction.reply({
-          content: lawsuit
+          content:
+            `⚖️ **Lawsuit Sent**\n\n` +
+            `The fake Dream World lawsuit was successfully sent to ${user}.`,
+          ephemeral: true
         });
       }
 
