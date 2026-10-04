@@ -210,8 +210,8 @@ const commands = [
 
     .addStringOption(option =>
       option
-        .setName("item_instance_id")
-        .setDescription("The item's PlayFab Instance ID.")
+        .setName("item_id")
+        .setDescription("The PlayFab catalog Item ID.")
         .setRequired(true)
     ),
 
@@ -591,16 +591,49 @@ client.on(
             "player_id"
           );
 
-        const itemInstanceId =
+        const itemId =
           interaction.options.getString(
-            "item_instance_id"
+            "item_id"
           );
 
+        // Get the player's inventory first
+        const inventoryResult =
+          await playFabRequest(
+            "GetUserInventory",
+            {
+              PlayFabId: playerId
+            }
+          );
+
+        const inventory =
+          inventoryResult.data?.Inventory || [];
+
+        // Find the first item with the matching Item ID
+        const item =
+          inventory.find(
+            inventoryItem =>
+              inventoryItem.ItemId === itemId
+          );
+
+        if (!item) {
+
+          return interaction.reply({
+            content:
+              `❌ **Item Not Found**\n\n` +
+              `**Player ID:** \`${playerId}\`\n` +
+              `**Item ID:** \`${itemId}\`\n\n` +
+              `That item was not found in the player's inventory.`,
+            ephemeral: true
+          });
+        }
+
+        // Revoke the actual ItemInstanceId found above
         await playFabRequest(
           "RevokeInventoryItem",
           {
             PlayFabId: playerId,
-            ItemInstanceId: itemInstanceId
+            ItemInstanceId:
+              item.ItemInstanceId
           }
         );
 
@@ -608,7 +641,7 @@ client.on(
           content:
             `🗑️ **Item Removed**\n\n` +
             `**Player ID:** \`${playerId}\`\n` +
-            `**Item Instance ID:** \`${itemInstanceId}\`\n` +
+            `**Item ID:** \`${itemId}\`\n` +
             `**Removed By:** ${interaction.user}`
         });
       }
