@@ -358,7 +358,21 @@ const commands = [
         .setName("user")
         .setDescription("The user who was denied.")
         .setRequired(true)
-    )
+    ),
+
+  // ==========================
+  // /GRANTALLCOSMETICS
+  // ==========================
+
+  new SlashCommandBuilder()
+    .setName("grantallcosmetics")
+    .setDescription("Grant catalog items marked as cosmetics to a PlayFab player.")
+    .addStringOption(option =>
+      option
+        .setName("player_id")
+        .setDescription("Your PlayFab Player ID.")
+        .setRequired(true)
+    ),
 
 ].map(command => command.toJSON());
 
@@ -467,7 +481,8 @@ client.on(
       interaction.commandName === "message" ||
       interaction.commandName === "sue" ||
       interaction.commandName === "accept" ||
-      interaction.commandName === "deny"
+      interaction.commandName === "deny" ||
+      interaction.commandName === "grantallcosmetics"
     ) {
 
       if (!canGrantItems(interaction)) {
@@ -973,6 +988,77 @@ client.on(
             `The denial message was successfully sent to ${user}.`,
           ephemeral: true
         });
+      }
+
+      // ==========================
+      // /GRANTALLCOSMETICS
+      // ==========================
+
+      if (interaction.commandName === "grantallcosmetics") {
+        await interaction.deferReply({ ephemeral: true });
+
+        const playerId = interaction.options.getString("player_id");
+
+        // Read the Legacy Catalog using PlayFab's Admin API.
+        const catalogResponse = await fetch(
+          `https://${PLAYFAB_TITLE_ID}.playfabapi.com/Admin/GetCatalogItems`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-SecretKey": PLAYFAB_SECRET_KEY
+            },
+            body: JSON.stringify({
+              CatalogVersion: PLAYFAB_CATALOG_VERSION
+            })
+          }
+        );
+
+        const catalogData = await catalogResponse.json();
+
+        if (!catalogResponse.ok || catalogData.code !== 200) {
+          throw new Error(
+            catalogData?.errorMessage ||
+            catalogData?.error ||
+            "Could not retrieve the PlayFab catalog."
+          );
+        }
+
+        const catalog = catalogData.data?.Catalog || [];
+
+        // Only grant catalog items whose Item Class contains "cosmetic".
+        const cosmetics = catalog.filter(item =>
+          typeof item.ItemClass === "string" &&
+          item.ItemClass.toLowerCase().includes("cosmetic")
+        );
+
+        if (cosmetics.length === 0) {
+          return interaction.editReply(
+            "❌ No cosmetics were found. Make sure each cosmetic's PlayFab Item Class contains the word `cosmetic`."
+          );
+        }
+
+        let granted = 0;
+
+        // Grant items in batches.
+        for (let i = 0; i < cosmetics.length; i += 25) {
+          const batch = cosmetics.slice(i, i + 25);
+
+          await playFabRequest("GrantItemsToUser", {
+            PlayFabId: playerId,
+            CatalogVersion: PLAYFAB_CATALOG_VERSION,
+            ItemIds: batch.map(item => item.ItemId)
+          });
+
+          granted += batch.length;
+        }
+
+        return interaction.editReply(
+          "✅ **Cosmetics Granted**\\n\\n" +
+          "**Player ID:** `" + playerId + "`\\n" +
+          "**Cosmetics granted:** `" + granted + "`\\n" +
+          "**Catalog:** `" + PLAYFAB_CATALOG_VERSION + "`"
+        );
       }
 
       // ==========================
