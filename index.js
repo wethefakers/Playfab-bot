@@ -1026,15 +1026,15 @@ client.on(
 
         const catalog = catalogData.data?.Catalog || [];
 
-        // Only grant catalog items whose Item Class contains "cosmetic".
+        // Grant every item in this catalog without checking ItemClass.
+        // IMPORTANT: this includes non-cosmetic items too if they are in the same catalog.
         const cosmetics = catalog.filter(item =>
-          typeof item.ItemClass === "string" &&
-          item.ItemClass.toLowerCase().includes("cosmetic")
+          typeof item.ItemId === "string" && item.ItemId.length > 0
         );
 
         if (cosmetics.length === 0) {
           return interaction.editReply(
-            "❌ No cosmetics were found. Make sure each cosmetic's PlayFab Item Class contains the word `cosmetic`."
+            "❌ No items were found in the selected PlayFab catalog."
           );
         }
 
